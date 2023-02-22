@@ -37,9 +37,11 @@ int recover_rest_line(char **save, char **line)
         char *tmp = malloc(sizeof(char) * (save_len + line_len + 1));
         if (!tmp)
         {
-            free(*line);
-            free(*save);
+            if (*line)
+                free(*line);
             *line = NULL;
+            if (*save)
+                free(*save);
             *save = NULL;
             return (0);
         }
@@ -165,29 +167,4 @@ char *get_next_line(int fd)
         }
     }
     return (NULL);
-}
-
-
-#include <fcntl.h>
-#include <stdio.h>
-
-int main(void)
-{
-    int fd = open("test.txt", O_RDONLY);
-    if (fd == -1)
-    {
-        perror("open");
-        exit(1);
-    }
-
-    printf("%s", get_next_line(fd));
-    printf("%s", get_next_line(fd));
-
-    if (close(fd) == -1)
-    {
-        perror("close");
-        exit(1);
-    }
-
-    return 0;
 }
