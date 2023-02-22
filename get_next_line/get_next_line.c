@@ -1,10 +1,4 @@
-#ifndef BUFFER_SIZE
-#define BUFFER_SIZE 10
-#endif
-
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include "get_next_line.h"
 
 int ft_strlen(char *str)
 {
@@ -13,132 +7,166 @@ int ft_strlen(char *str)
     if (!str)
         return (0);
     i = 0;
-    while (str[i] != '\0')
+    while (str[i])
         i++;
     return (i);
 }
 
-char *recover_save(char **save, char *line)
+int new_line_index(char *str)
+{
+    int i;
+
+    if (!str)
+        return (-1);
+    i = 0;
+    while (str[i])
+    {
+        if (str[i] == '\n')
+            return (i);
+        i++;
+    }
+    return (-1);
+}
+
+int recover_rest_line(char **save, char **line)
 {
     if ((*save))
     {
-        int save_len = ft_strlen((*save));
-        int str_len = ft_strlen(line);
-        char *tmp = malloc(sizeof(char) * (save_len + str_len + 1));
+        int save_len = ft_strlen(*save);
+        int line_len = ft_strlen(*line);
+        char *tmp = malloc(sizeof(char) * (save_len + line_len + 1));
         if (!tmp)
         {
-            free(line);
-            free((*save));
-            return (NULL);
+            free(*line);
+            free(*save);
+            *line = NULL;
+            *save = NULL;
+            return (0);
         }
-        tmp[save_len + str_len] = 0;
-        if ((*save))
+        tmp[save_len + line_len] = 0;
+        if (*save)
         {
             while (save_len >= 0)
             {
                 tmp[save_len] = (*save)[save_len];
                 save_len--;
             }
-            free((*save));
+            free(*save);
+            *save = NULL;
         }
-        if (line)
+        if (*line)
         {
-            while (str_len >= 0)
+            while (line_len >= 0)
             {
-                tmp[save_len + str_len] = line[str_len];
-                str_len--;
+                tmp[save_len + line_len] = (*line)[line_len];
+                line_len--;
             }
-            free(line);
+            free(*line);
+            *line = NULL;
         }
-        *save = NULL;
-        return (tmp);
+        *line = tmp;
     }
-    return (line);
+    return (1);
 }
 
-char *ft_realloc(char *str, char **save)
+int save_rest_line(char **line, char **save)
 {
-    str = recover_save(save, str);
-    if (!str)
+    int line_len = ft_strlen(*line);
+    int nl_index_position = new_line_index(*line);
+    int save_len = line_len - nl_index_position - 1;
+    *save = malloc(sizeof(char) * (save_len + 1));
+    if (!(*save))
     {
-        str = malloc(sizeof(char) * (BUFFER_SIZE + 1));
-        if (!str)
-            return (NULL);
-        str[BUFFER_SIZE] = 0;
+        free(*line);
+        *line = NULL;
+        return (0);
+    }
+    (*save)[save_len] = 0;
+    while (save_len >= 0)
+    {
+        (*save)[save_len] = (*line)[nl_index_position + 1 + save_len];
+        (*line)[nl_index_position + 1 + save_len] = 0;
+        save_len--;
+    }
+    return (1);
+}
+
+int gnl_realloc(char **line)
+{
+    if (!(*line))
+    {
+        *line = malloc(sizeof(char) * (BUFFER_SIZE + 1));
+        if (!(*line))
+            return (0);
+        (*line)[BUFFER_SIZE] = 0;
     }
     else
     {
-        int tmp_len = ft_strlen(str);
-        char *tmp = malloc(sizeof(char) * (tmp_len + BUFFER_SIZE + 1));
+        int line_len = ft_strlen(*line);
+        char *tmp = malloc(sizeof(char) * (line_len + BUFFER_SIZE + 1));
         if (!tmp)
         {
-            free(str);
-            return (NULL);
+            free(*line);
+            *line = NULL;
+            return (0);
         }
-        tmp[tmp_len + BUFFER_SIZE] = 0;
-        while (tmp_len >= 0 && str)
+        tmp[line_len + BUFFER_SIZE] = 0;
+        while (line_len >= 0)
         {
-            tmp[tmp_len] = str[tmp_len];
-            tmp_len--;
+            tmp[line_len] = (*line)[line_len];
+            line_len--;
         }
-        free(str);
-        str = &(*tmp);
+        free(*line);
+        *line = tmp;
     }
-    return (str);
-}
-
-int ft_strchr(char *str, char c)
-{
-    int i;
-
-    if (!str)
-        return (0);
-    i = 0;
-    while (str[i])
-    {
-        if (str[i] == c)
-            return (i);
-        i++;
-    }
-    return (0);
+    return (1);
 }
 
 char *get_next_line(int fd)
 {
+    int read_bytes = 0;
     char *line = NULL;
     static char *save = NULL;
-    int read_bytes = 0;
 
-    while ((line = ft_realloc(line, &save)) != NULL && (read_bytes = read(fd, &line[ft_strlen(line)], BUFFER_SIZE)) > 0)
+    while (1)
     {
-        if (!line)
-            return (NULL);
-        else if (read_bytes < BUFFER_SIZE)
+        if (save)
         {
-            line[read_bytes] = 0;
+            if (!recover_rest_line(&save, &line))
+                return (NULL);
+            if (new_line_index(line) != -1)
+            {
+                if (!save_rest_line(&line, &save))
+                    return (NULL);
+                return (line);
+            }
+        }
+        if (!gnl_realloc(&line))
+            return (NULL);
+        read_bytes = read(fd, &line[ft_strlen(line)], BUFFER_SIZE);
+        if (read_bytes == -1)
+        {
+            free(line);
+            line = NULL;
+            return (NULL);
+        }
+        else if (new_line_index(line) != -1)
+        {
+            if (!save_rest_line(&line, &save))
+                return (NULL);
             return (line);
         }
-        else if (ft_strchr(line, '\n'))
+        else if (read_bytes < BUFFER_SIZE)
         {
-            save = malloc(sizeof(char) * (ft_strlen(line) - ft_strchr(line, '\n') + 1));
-            if (!save)
-            {
-                free(line);
-                return (NULL);
-            }
-            int i = 1;
-            while (line[ft_strchr(line, '\n') + i])
-            {
-                save[i - 1] = line[ft_strchr(line, '\n') + i];
-                line[ft_strchr(line, '\n') + i] = 0;
-                i++;
-            }
-            save[i - 1] = 0;
+            if (read_bytes == 0)
+                return (line);
+            line[ft_strlen(line)] = 0;
             return (line);
         }
     }
     return (NULL);
 }
+
 
 #include <fcntl.h>
 #include <stdio.h>
@@ -152,21 +180,8 @@ int main(void)
         exit(1);
     }
 
-    char *line = NULL;
-    while ((line = get_next_line(fd)) != NULL)
-    {
-        printf("%s\n", line);
-        free(line);
-    }
-
-    if (line == NULL)
-    {
-        printf("Reached end of file.\n");
-    }
-    else
-    {
-        printf("Error: get_next_line returned NULL.\n");
-    }
+    printf("%s", get_next_line(fd));
+    printf("%s", get_next_line(fd));
 
     if (close(fd) == -1)
     {
