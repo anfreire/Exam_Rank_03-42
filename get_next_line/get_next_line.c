@@ -1,4 +1,4 @@
-// INCLUDES
+#include "header.h"
 
 int ft_strlen(char *str)
 {
@@ -24,7 +24,7 @@ char *return_line(char *buffer)
         i++;
     if (buffer[i] == '\0')
         return (NULL);
-    line = malloc(sizeof(char) * (i + 1));
+    line = malloc(sizeof(char) * (i + 2));
     if (!line)
         return (NULL);
     while (j <= i)
@@ -86,8 +86,8 @@ char *append_buffer(char *buffer)
 
 char *get_next_line(int fd)
 {
-    static char *buffer;
-    char *line;
+    static char *buffer = NULL;
+    char *line = NULL;
     int i;
 
     if (fd < 0 || BUFFER_SIZE <= 0)
