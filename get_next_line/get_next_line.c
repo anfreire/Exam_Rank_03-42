@@ -1,4 +1,4 @@
-#include "get_next_line.h"
+// INCLUDES
 
 int ft_strlen(char *str)
 {
@@ -12,159 +12,111 @@ int ft_strlen(char *str)
     return (i);
 }
 
-int new_line_index(char *str)
+char *return_line(char *buffer)
 {
     int i;
+    int j;
+    char *line;
 
-    if (!str)
-        return (-1);
     i = 0;
-    while (str[i])
+    j = 0;
+    while (buffer[i] != '\n' && buffer[i] != '\0')
+        i++;
+    if (buffer[i] == '\0')
+        return (NULL);
+    line = malloc(sizeof(char) * (i + 1));
+    if (!line)
+        return (NULL);
+    while (j <= i)
     {
-        if (str[i] == '\n')
-            return (i);
+        line[j] = buffer[j];
+        j++;
+    }
+    line[j] = '\0';
+    return (line);
+}
+
+char *remove_line_from_buffer(char *buffer)
+{
+    int i;
+    int j;
+    char *new_buffer;
+
+    i = 0;
+    j = 0;
+    while (buffer[i] != '\n' && buffer[i] != '\0')
+        i++;
+    if (buffer[i] == '\0')
+        return (NULL);
+    new_buffer = malloc(sizeof(char) * (ft_strlen(buffer) - i + 1));
+    if (!new_buffer)
+        return (NULL);
+    i++;
+    while (buffer[i] != '\0')
+    {
+        new_buffer[j] = buffer[i];
+        i++;
+        j++;
+    }
+    new_buffer[j] = '\0';
+    free(buffer);
+    buffer = NULL;
+    return (new_buffer);
+}
+
+char *append_buffer(char *buffer)
+{
+    int i;
+    char *new_buffer;
+
+    new_buffer = malloc(sizeof(char) * (ft_strlen(buffer) + BUFFER_SIZE + 1));
+    if (!new_buffer)
+        return (NULL);
+    i = 0;
+    while (buffer[i] != '\0')
+    {
+        new_buffer[i] = buffer[i];
         i++;
     }
-    return (-1);
-}
-
-int recover_rest_line(char **save, char **line)
-{
-    if ((*save))
-    {
-        int save_len = ft_strlen(*save);
-        int line_len = ft_strlen(*line);
-        char *tmp = malloc(sizeof(char) * (save_len + line_len + 1));
-        if (!tmp)
-        {
-            if (*line)
-                free(*line);
-            *line = NULL;
-            if (*save)
-                free(*save);
-            *save = NULL;
-            return (0);
-        }
-        tmp[save_len + line_len] = 0;
-        if (*save)
-        {
-            while (save_len >= 0)
-            {
-                tmp[save_len] = (*save)[save_len];
-                save_len--;
-            }
-            free(*save);
-            *save = NULL;
-        }
-        if (*line)
-        {
-            while (line_len >= 0)
-            {
-                tmp[save_len + line_len] = (*line)[line_len];
-                line_len--;
-            }
-            free(*line);
-            *line = NULL;
-        }
-        *line = tmp;
-    }
-    return (1);
-}
-
-int save_rest_line(char **line, char **save)
-{
-    int line_len = ft_strlen(*line);
-    int nl_index_position = new_line_index(*line);
-    int save_len = line_len - nl_index_position - 1;
-    *save = malloc(sizeof(char) * (save_len + 1));
-    if (!(*save))
-    {
-        free(*line);
-        *line = NULL;
-        return (0);
-    }
-    (*save)[save_len] = 0;
-    while (save_len >= 0)
-    {
-        (*save)[save_len] = (*line)[nl_index_position + 1 + save_len];
-        (*line)[nl_index_position + 1 + save_len] = 0;
-        save_len--;
-    }
-    return (1);
-}
-
-int gnl_realloc(char **line)
-{
-    if (!(*line))
-    {
-        *line = malloc(sizeof(char) * (BUFFER_SIZE + 1));
-        if (!(*line))
-            return (0);
-        (*line)[BUFFER_SIZE] = 0;
-    }
-    else
-    {
-        int line_len = ft_strlen(*line);
-        char *tmp = malloc(sizeof(char) * (line_len + BUFFER_SIZE + 1));
-        if (!tmp)
-        {
-            free(*line);
-            *line = NULL;
-            return (0);
-        }
-        tmp[line_len + BUFFER_SIZE] = 0;
-        while (line_len >= 0)
-        {
-            tmp[line_len] = (*line)[line_len];
-            line_len--;
-        }
-        free(*line);
-        *line = tmp;
-    }
-    return (1);
+    new_buffer[i] = '\0';
+    free(buffer);
+    buffer = NULL;
+    return (new_buffer);
 }
 
 char *get_next_line(int fd)
 {
-    int read_bytes = 0;
-    char *line = NULL;
-    static char *save = NULL;
+    static char *buffer;
+    char *line;
+    int i;
 
-    while (1)
+    if (fd < 0 || BUFFER_SIZE <= 0)
+        return (NULL);
+    if (!buffer)
     {
-        if (save)
-        {
-            if (!recover_rest_line(&save, &line))
-                return (NULL);
-            if (new_line_index(line) != -1)
-            {
-                if (!save_rest_line(&line, &save))
-                    return (NULL);
-                return (line);
-            }
-        }
-        if (!gnl_realloc(&line))
+        buffer = malloc(sizeof(char) * (BUFFER_SIZE + 1));
+        if (!buffer)
             return (NULL);
-        read_bytes = read(fd, &line[ft_strlen(line)], BUFFER_SIZE);
-        if (read_bytes == -1)
-        {
-            free(line);
-            line = NULL;
-            return (NULL);
-        }
-        else if (new_line_index(line) != -1)
-        {
-            if (!save_rest_line(&line, &save))
-                return (NULL);
-            return (line);
-        }
-        else if (read_bytes < BUFFER_SIZE)
-        {
-            if (read_bytes == 0)
-                return (line);
-            line[ft_strlen(line)] = 0;
-            return (line);
-        }
     }
-    return (NULL);
+    i = 0;
+    while (buffer[i] != '\0' && buffer[i] != '\n')
+        i++;
+    if (buffer[i] == '\0')
+    {
+        buffer = append_buffer(buffer);
+        if (!buffer)
+            return (NULL);
+        int len = ft_strlen(buffer);
+        i = read(fd, buffer + ft_strlen(buffer), BUFFER_SIZE);
+        buffer[len + i] = '\0';
+        if (i == -1)
+            return (NULL);
+        buffer[ft_strlen(buffer)] = '\0';
+        if (i == 0)
+            return (NULL);
+        return (get_next_line(fd));
+    }
+    line = return_line(buffer);
+    buffer = remove_line_from_buffer(buffer);
+    return (line);
 }
